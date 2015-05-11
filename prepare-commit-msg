@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+#
+# Script for appending the Redmine id of a story to the commits
+# Branches must begin with st{redmine_story_id}_description_here
+#
+# Reads the Redmine story from the branch name and appends it to the
+# commit messages. Supports the following formats
+#
+# Examples:
+#     st{#redmine_id}_commit_description_here
+#     hotfix/st{#redmine_id}_commit_description_here
+#     feature/st{#redmine_id}_commit_description_here
+#
+# Sohaib Talaat Bhatti -- sohaibbbhatti@gmail.com
+# sohaib.io
+
+
+def blank?(message)
+  message.nil? || message.empty?
+end
+
+# Detects whether any string prepends the git message.
+#
+# Example
+#
+#  message.exists? "My first commit
+#  # Please enter the commit message for your changes. Lines starting" => true
+#
+def message_exists?(message)
+  blank? message.rpartition(commit_msg_start).first
+end
+
+def commit_msg_start
+  "# Please enter the commit message for your changes. Lines starting"
+end
+
+branch_name = `git branch`[/\* (.+)/]
+story_subset = branch_name[/\* ((feature\/)|(hotfix\/)){0,1}st(\d+)/]
+
+# Regex for detecting Redmine story id
+redmine_story_id = "##{story_subset[/\d+/]}" if story_subset
+
+message_file = ARGV[0]
+message = File.read(message_file)
+
+message = if redmine_story_id
+            # Only commit if commit message exists
+            message_exists?(message) ? [message, "refs #{redmine_story_id}"].join(' ').gsub(/\n/,'') : false
+          else
+            message
+          end
+
+File.open(message_file, 'w') { |f| f.write message } if message
